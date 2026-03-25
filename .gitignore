@@ -1,0 +1,7 @@
+*.o
+*.exe
+*.out
+*.elf
+*.bin
+*.hex
+*.map
