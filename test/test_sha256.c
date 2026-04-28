@@ -1,14 +1,15 @@
 /*
- * SHA-256 Test — NIST FIPS 180-4 known-answer tests
+ * SHA-256 / HMAC-SHA-256 Test
  *
  * Build:
- *   gcc -O2 -I.. -o test_sha256 test_sha256.c ../sha256.c
+ *   gcc -O2 -I.. -o test_sha256 test_sha256.c ../sha256.c ../hmac_sha256.c
  *
  * Run:
  *   ./test_sha256
  */
 
 #include "sha256.h"
+#include "hmac_sha256.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -395,6 +396,134 @@ static int test_file_hash(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Test 5: HMAC-SHA-256 — RFC 4231 known-answer tests               */
+/* ------------------------------------------------------------------ */
+static int test_hmac_sha256(void) {
+    int pass = 0, fail = 0;
+
+    printf("=== HMAC-SHA-256 tests (RFC 4231) ===\n");
+
+    /* Helper macro to run one HMAC vector */
+#define HMAC_CHECK(label, key, key_len, data, data_len, expected_hex) \
+    do { \
+        uint8_t mac[32]; \
+        char    hex[65]; \
+        hmac_sha256(mac, (const uint8_t *)(key), (key_len), \
+                        (const uint8_t *)(data), (data_len)); \
+        to_hex(mac, hex); \
+        if (strcmp(hex, (expected_hex)) == 0) { \
+            printf("  [PASS] %s\n", (label)); \
+            pass++; \
+        } else { \
+            printf("  [FAIL] %s\n", (label)); \
+            printf("    expected: %s\n", (expected_hex)); \
+            printf("    got:      %s\n", hex); \
+            fail++; \
+        } \
+    } while (0)
+
+    /* --- TC1: 20-byte key of 0x0b, "Hi There" --- */
+    {
+        static const uint8_t key[] = {
+            0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,
+            0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b,0x0b
+        };
+        HMAC_CHECK("TC1: key=20x0b, data=\"Hi There\"",
+                   key, sizeof(key), "Hi There", 8,
+                   "b0344c61d8db38535ca8afceaf0bf12b"
+                   "881dc200c9833da726e9376c2e32cff7");
+    }
+
+    /* --- TC2: "Jefe", "what do ya want for nothing?" --- */
+    HMAC_CHECK("TC2: key=\"Jefe\", data=\"what do ya want for nothing?\"",
+               "Jefe", 4,
+               "what do ya want for nothing?", 28,
+               "5bdcc146bf60754e6a042426089575c7"
+               "5a003f089d2739839dec58b964ec3843");
+
+    /* --- TC3: 20-byte key of 0xaa, 50-byte data of 0xdd --- */
+    {
+        static const uint8_t key[20]  = {
+            0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,
+            0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa
+        };
+        static const uint8_t data[50] = {
+            0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,
+            0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,
+            0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,
+            0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,
+            0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd,0xdd
+        };
+        HMAC_CHECK("TC3: key=20x0xaa, data=50x0xdd",
+                   key, sizeof(key), data, sizeof(data),
+                   "773ea91e36800e46854db8ebd09181a7"
+                   "2959098b3ef8c122d9635514ced565fe");
+    }
+
+    /* --- TC4: 25-byte sequential key, 50-byte data of 0xcd --- */
+    {
+        static const uint8_t key[] = {
+            0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,
+            0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14,
+            0x15,0x16,0x17,0x18,0x19
+        };
+        static const uint8_t data[50] = {
+            0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,
+            0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,
+            0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,
+            0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,
+            0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd,0xcd
+        };
+        HMAC_CHECK("TC4: key=0x01..0x19, data=50x0xcd",
+                   key, sizeof(key), data, sizeof(data),
+                   "82558a389a443c0ea4cc819899f2083a"
+                   "85f0faa3e578f8077a2e3ff46729665b");
+    }
+
+    /* --- TC5: 20-byte key of 0x0c, "Test With Truncation" --- */
+    {
+        static const uint8_t key[20] = {
+            0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,
+            0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c,0x0c
+        };
+        HMAC_CHECK("TC5: key=20x0x0c, data=\"Test With Truncation\"",
+                   key, sizeof(key), "Test With Truncation", 20,
+                   "a3b6167473100ee06e0c796c2955552b"
+                   "fa6f7c0a6a8aef8b93f860aab0cd20c5");
+    }
+
+    /* --- TC6: 131-byte key of 0xaa (> block size), short data --- */
+    {
+        uint8_t key[131];
+        memset(key, 0xaa, sizeof(key));
+        HMAC_CHECK("TC6: key=131x0xaa (>block), \"Test Using Larger Than Block-Size Key - Hash Key First\"",
+                   key, sizeof(key),
+                   "Test Using Larger Than Block-Size Key - Hash Key First", 54,
+                   "60e431591ee0b67f0d8a26aacbf5b77f"
+                   "8e0bc6213728c5140546040f0ee37f54");
+    }
+
+    /* --- TC7: 131-byte key of 0xaa (> block size), long data --- */
+    {
+        uint8_t key[131];
+        memset(key, 0xaa, sizeof(key));
+        const char *data =
+            "This is a test using a larger than block-size key and a larger"
+            " than block-size data. The key needs to be hashed before being"
+            " used by the HMAC algorithm.";
+        HMAC_CHECK("TC7: key=131x0xaa (>block), long data",
+                   key, sizeof(key), data, strlen(data),
+                   "9b09ffa71b942fcb27635fbcd5b0e944"
+                   "bfdc63644f0713938a7f51535c3a35e2");
+    }
+
+#undef HMAC_CHECK
+
+    printf("  Result: %d/%d passed\n\n", pass, pass + fail);
+    return fail;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main                                                              */
 /* ------------------------------------------------------------------ */
 int main(void) {
@@ -406,6 +535,7 @@ int main(void) {
     total_fail += test_incremental();
     total_fail += test_million_a();
     total_fail += test_file_hash();
+    total_fail += test_hmac_sha256();
 
     printf("====================\n");
     if (total_fail == 0)
