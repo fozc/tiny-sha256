@@ -173,7 +173,7 @@ static int test_incremental(void) {
         size_t len = vectors[i].input_len;
 
         /* Feed data 1 byte at a time (worst-case test) */
-        sha256_ctx ctx;
+        sha256_ctx_t ctx;
         sha256_init(&ctx);
         for (size_t j = 0; j < len; j++)
             sha256_update(&ctx, &data[j], 1);
@@ -196,7 +196,7 @@ static int test_incremental(void) {
 
     /* Feed "abc" in 2 chunks: "a" + "bc" */
     {
-        sha256_ctx ctx;
+        sha256_ctx_t ctx;
         sha256_init(&ctx);
         sha256_update(&ctx, (const uint8_t *)"a", 1);
         sha256_update(&ctx, (const uint8_t *)"bc", 2);
@@ -223,7 +223,7 @@ static int test_incremental(void) {
 
     /* Empty updates should not affect the result */
     {
-        sha256_ctx ctx;
+        sha256_ctx_t ctx;
         sha256_init(&ctx);
         sha256_update(&ctx, (const uint8_t *)"a", 0);
         sha256_update(&ctx, (const uint8_t *)"abc", 3);
@@ -251,7 +251,7 @@ static int test_incremental(void) {
 
     /* init + final with no update (zero-length input) */
     {
-        sha256_ctx ctx;
+        sha256_ctx_t ctx;
         sha256_init(&ctx);
 
         uint8_t hash[32];
@@ -279,7 +279,7 @@ static int test_incremental(void) {
         const char *input =
             "abcdefghijklmnopqrstuvwxyz0123456789"
             "abcdefghijklmnopqrstuvwxyz012";
-        sha256_ctx ctx;
+        sha256_ctx_t ctx;
         sha256_init(&ctx);
         sha256_update(&ctx, (const uint8_t *)input, 64);
         sha256_update(&ctx, (const uint8_t *)input + 64, 1);
@@ -320,7 +320,7 @@ static int test_million_a(void) {
     uint8_t buf[1000];
     memset(buf, 'a', sizeof(buf));
 
-    sha256_ctx ctx;
+    sha256_ctx_t ctx;
     sha256_init(&ctx);
     for (int i = 0; i < 1000; i++)
         sha256_update(&ctx, buf, sizeof(buf));
@@ -363,7 +363,7 @@ static int test_file_hash(void) {
     }
 
     /* Hash the file in 256-byte chunks (realistic MCU buffer size) */
-    sha256_ctx ctx;
+    sha256_ctx_t ctx;
     sha256_init(&ctx);
 
     uint8_t buf[256];

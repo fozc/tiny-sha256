@@ -25,12 +25,29 @@ sha256((const uint8_t *)"abc", 3, hash);
 Feed data in chunks — ideal for UART, SPI, DMA, or file streaming:
 
 ```c
-sha256_ctx ctx;
+sha256_ctx_t ctx;
 sha256_init(&ctx);
 sha256_update(&ctx, buf1, len1);
 sha256_update(&ctx, buf2, len2);
 sha256_final(&ctx, hash);
 ```
+
+### HMAC-SHA-256
+
+Compute a keyed message authentication code (RFC 2104 / RFC 4231):
+
+```c
+#include "hmac_sha256.h"
+
+uint8_t mac[32];
+hmac_sha256(mac,
+            key,  key_len,
+            data, data_len);
+```
+
+- Keys longer than 64 bytes are automatically hashed before use
+- All intermediate buffers are zeroed on return
+- Conforms to RFC 4231 test vectors
 
 ## Salt usage
 
@@ -43,7 +60,7 @@ The incremental API supports this naturally — no extra function needed:
 uint8_t salt[16];  // 16+ bytes, generated from RNG/TRNG
 uint8_t hash[32];
 
-sha256_ctx ctx;
+sha256_ctx_t ctx;
 sha256_init(&ctx);
 sha256_update(&ctx, salt, sizeof(salt));       // salt first
 sha256_update(&ctx, password, password_len);   // then data

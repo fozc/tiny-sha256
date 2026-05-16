@@ -48,7 +48,7 @@ static void sha256_process_block(uint32_t h[8], const uint8_t block[64]) {
     for (int i = 0; i < 64; i++) {
         uint32_t wi;
         if (i < 16) {
-            /* Big-endian load: Cortex-M4'te LDR + REV */
+            /* Big-endian load */
             uint32_t tmp;
             memcpy(&tmp, &block[i * 4], 4);
             wi = BSWAP32(tmp);
@@ -86,7 +86,7 @@ static void sha256_write_be32(uint8_t *dst, const uint32_t *src, int count) {
 }
 
  
-void sha256_init(sha256_ctx *ctx) {
+void sha256_init(sha256_ctx_t *ctx) {
     ctx->h[0] = 0x6a09e667; ctx->h[1] = 0xbb67ae85;
     ctx->h[2] = 0x3c6ef372; ctx->h[3] = 0xa54ff53a;
     ctx->h[4] = 0x510e527f; ctx->h[5] = 0x9b05688c;
@@ -95,7 +95,7 @@ void sha256_init(sha256_ctx *ctx) {
     ctx->total_len = 0;
 }
 
-void sha256_update(sha256_ctx *ctx, const uint8_t *data, size_t len) {
+void sha256_update(sha256_ctx_t *ctx, const uint8_t *data, size_t len) {
     ctx->total_len += len;
  
     if (ctx->block_len > 0) {
@@ -124,7 +124,7 @@ void sha256_update(sha256_ctx *ctx, const uint8_t *data, size_t len) {
     }
 }
 
-void sha256_final(sha256_ctx *ctx, uint8_t hash[32]) {
+void sha256_final(sha256_ctx_t *ctx, uint8_t hash[32]) {
     uint8_t *block = ctx->block;
     size_t remaining = ctx->block_len;
  
@@ -155,7 +155,7 @@ void sha256_final(sha256_ctx *ctx, uint8_t hash[32]) {
 }
  
 void sha256(const uint8_t *data, size_t len, uint8_t hash[32]) {
-    sha256_ctx ctx;
+    sha256_ctx_t ctx;
     sha256_init(&ctx);
     sha256_update(&ctx, data, len);
     sha256_final(&ctx, hash);

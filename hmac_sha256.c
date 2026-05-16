@@ -6,10 +6,10 @@ void hmac_sha256(uint8_t mac[32],
                  const uint8_t *data, size_t data_len)
 {
     uint8_t k_pad[64];
-    sha256_ctx ctx;
+    sha256_ctx_t ctx;
     uint8_t inner[32];
 
-    /* Key > 64 byte ise hash'le */
+    /* If key > 64 bytes, hash it first */
     uint8_t key_hash[32];
     if (key_len > 64) {
         sha256(key, key_len, key_hash);
@@ -34,4 +34,9 @@ void hmac_sha256(uint8_t mac[32],
     sha256_update(&ctx, k_pad, 64);
     sha256_update(&ctx, inner, 32);
     sha256_final(&ctx, mac);
+
+    /* Scrub sensitive stack buffers */
+    memset(k_pad, 0, sizeof(k_pad));
+    memset(inner, 0, sizeof(inner));
+    memset(key_hash, 0, sizeof(key_hash));
 }
