@@ -45,57 +45,79 @@ hmac_sha256(mac,
             data, data_len);
 ```
 
-- Keys longer than 64 bytes are automatically hashed before use
-- All intermediate buffers are zeroed on return
-- Conforms to RFC 4231 test vectors
+For input delivered in chunks, initialize the context, pass each chunk to
+`hmac_sha256_update()`, and finish with `hmac_sha256_final()`.
+
+```c
+hmac_sha256_ctx ctx;
+hmac_sha256_init(&ctx, key, key_len);
+hmac_sha256_update(&ctx, buf1, len1);
+hmac_sha256_update(&ctx, buf2, len2);
+hmac_sha256_final(&ctx, mac);
+```
+
+Keys longer than 64 bytes are hashed before use. Finalizing clears the context.
+
+### PBKDF2-HMAC-SHA256
+
+Derive a 32-byte verifier using a caller-supplied 16-byte salt and a positive
+iteration count. Measure execution time on the target before choosing the
+iteration count.
+
+```c
+#include "hmac_sha256.h"
+
+uint8_t verifier[32];
+bool derived = pbkdf2_hmac_sha256(verifier, password, password_len, salt, iterations);
+```
+
+The function returns false for a zero iteration count, a null output or salt,
+or a null password with a nonzero length. The output is untouched on failure.
 
 ## Salt usage
 
-A salt is a random value prepended to the data before hashing. It ensures
-identical inputs produce different hashes, preventing rainbow table attacks.
+### Single-pass salted SHA-256
 
-The incremental API supports this naturally — no extra function needed:
+A fresh random salt makes identical inputs produce different digests.
+Provide `salt` as a buffer already filled with 16 random bytes. The
+incremental API computes `SHA256(salt || data)`:
 
 ```c
-uint8_t salt[16];  // 16+ bytes, generated from RNG/TRNG
 uint8_t hash[32];
-
 sha256_ctx_t ctx;
+
 sha256_init(&ctx);
-sha256_update(&ctx, salt, sizeof(salt));       // salt first
-sha256_update(&ctx, password, password_len);   // then data
+sha256_update(&ctx, salt, 16U);      // Salt first
+sha256_update(&ctx, data, data_len); // Then the input data
 sha256_final(&ctx, hash);
-
-// Store: salt (plaintext) + hash
-// Verify: recompute with same salt, compare hash
 ```
 
-**Notes:**
-- Use at least 16 bytes of salt (128-bit)
-- Generate a unique salt per entry — never reuse
-- Salt is not secret — store it alongside the hash
-- For password storage, prefer key-stretching (PBKDF2, bcrypt) when resources allow
+Keep the salt alongside the digest if you need to reproduce it. For password
+records, use [PBKDF2-HMAC-SHA256](#pbkdf2-hmac-sha256).
 
-## Building
+### Salt for a PBKDF2 password record
 
-```
-gcc -O2 -o test_sha256 test/test_sha256.c sha256.c -I.
-```
+The calling application generates a fresh 16-byte salt from a cryptographically
+secure random source when creating or replacing a password record. After a
+successful derivation, store the salt and iteration count with the verifier.
+
+To verify a password, load the stored salt, iteration count, and verifier.
+Pass the candidate password and the stored parameters to
+`pbkdf2_hmac_sha256()`, then compare the two verifiers in constant time.
 
 ## Testing
 
 ```
-cd test
-gcc -O2 -I.. -o test_sha256 test_sha256.c ../sha256.c
+gcc -O2 -I. -o test_sha256 test/test_sha256.c sha256.c hmac_sha256.c
+gcc -O2 -I. -o test_hmac_sha256 test/test_hmac_sha256.c hmac_sha256.c sha256.c
 ./test_sha256
+./test_hmac_sha256
 ```
 
-The test suite includes:
-- NIST FIPS 180-4 known-answer vectors
-- Padding boundary tests (55, 56, 63, 64, 65, 119, 128 bytes)
-- Incremental API edge cases (1-byte chunks, empty updates, block crossing)
-- 1,000,000 x 'a' long data test
-- 512 KB pseudo-random file hash test
+The SHA-256 suite covers known answers, padding, incremental updates, and
+long inputs. The HMAC suite checks an RFC 4231 long-key vector with both APIs.
+PBKDF2 vectors cover multiple iteration counts, an empty password, and a
+password longer than the SHA-256 block size.
 
 ## License
 
